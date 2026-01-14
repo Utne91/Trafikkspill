@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Trafikkhelten: Øvelseskjøring</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #87CEEB;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100vh;
+            display: block;
+        }
+
+        /* UI Overlay Styles */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+        }
+
+        .hud-info {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .coin-display {
+            color: #facc15;
+            text-shadow: 1px 1px 0 #b45309;
+        }
+
+        /* Floating Text */
+        .float-text {
+            position: absolute;
+            color: #FFFF00;
+            font-weight: bold;
+            font-size: 24px;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+            text-shadow: 0 0 5px #000;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -150%) scale(1.5); }
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.98);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            max-width: 700px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            pointer-events: auto;
+            border: 4px solid #3b82f6;
+            z-index: 100;
+        }
+
+        h1 { margin-top: 0; color: #1e3a8a; font-size: 2rem; }
+        h2 { color: #333; margin-bottom: 20px;}
+        h3 { margin: 10px 0; color: #444; }
+        p { color: #555; font-size: 18px; line-height: 1.5; }
+
+        .highscore-display {
+            background-color: #fef3c7;
+            color: #d97706;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            margin: 10px 0;
+            border: 1px solid #fcd34d;
+        }
+
+        .btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 8px;
+            transition: transform 0.1s, background 0.2s;
+            width: 100%;
+            max-width: 300px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn:hover { background-color: #2563eb; }
+        .btn-green { background-color: #22c55e; }
+        .btn-green:hover { background-color: #16a34a; }
+        .btn-purple { background-color: #9333ea; }
+        .btn-purple:hover { background-color: #7e22ce; }
+        .btn-disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+        .hidden { display: none !important; }
+
+        /* Garage Styles - Dark Theme */
+        #garage-screen {
+            background: #1f2937;
+            color: white;
+            border-color: #4b5563;
+        }
+        #garage-screen h1 { color: #60a5fa; }
+        #garage-screen h3 { color: #9ca3af; }
+        
+        .garage-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .garage-item {
+            background: #374151;
+            border: 2px solid #4b5563;
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s;
+        }
+        .garage-item.equipped { border-color: #22c55e; background-color: #064e3b; box-shadow: 0 0 10px #22c55e; }
+        .garage-item h4 { margin: 5px 0; font-size: 16px; color: white; }
+        .car-preview { width: 50px; height: 30px; margin: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
+        .price-tag { font-size: 14px; color: #fbbf24; font-weight: bold; margin-bottom: 5px; }
+
+        /* Legend Grid */
+        .legend-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            text-align: left;
+            margin: 20px 0;
+            background: #f0f9ff;
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .icon-obstacle { background-color: #ef4444; border: 2px solid #991b1b; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-radius: 0; }
+        .icon-coin { background-color: #facc15; border: 2px solid #b45309; }
+        .icon-boost { background-color: #22c55e; border: 2px solid #14532d; transform: rotate(45deg); border-radius: 0; }
+        .icon-cash { background-color: #22c55e; border: 1px solid #14532d; width: 24px; height: 12px; border-radius: 2px; }
+
+        #flash-overlay {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px;
+            color: #FFFF00;
+            font-weight: 900;
+            text-shadow: 0 0 20px rgba(0,0,0,0.8);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 50;
+            text-align: center;
+            white-space: nowrap;
+        }
+        
+        .countdown-anim {
+            animation: popIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            font-size: 16px;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        #effect-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 10;
+        }
+
+        #quiz-lives-display {
+            font-size: 1.5rem;
+            color: #d32f2f;
+            margin-bottom: 10px;
+            letter-spacing: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="effect-overlay"></div>
+    <div id="float-text-container"></div>
+
+    <div id="flash-overlay"></div>
+
+    <div id="ui-layer">
+        <div class="hud-top" id="hud" style="display:none;">
+            <div class="hud-info">
+                <div>Nivå: <span id="level-display">1</span></div>
+                <div>Poeng: <span id="score">0</span></div>
+                <div class="coin-display">Lommebok: <span id="hud-coins">0</span> kr</div>
+            </div>
+            <div style="text-align:right;">
+                <div>Rekord: <span id="hud-highscore">0</span></div>
+            </div>
+        </div>
+        
+        <div id="controls-hint" style="display:none;">
+            ← Trykk for å styre →
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="modal">
+        <h1>Trafikkhelten</h1>
+        <div class="highscore-display">Gjeldende Rekord: <span id="start-highscore">0</span></div>
+        <div class="coin-display" style="font-size: 1.2rem; margin-bottom: 10px;">Din Bank: <span id="start-coins">0</span> kr</div>
+        
+        <div class="legend-grid">
+            <div style="display:flex; align-items:center;"><div class="legend-icon icon-obstacle"></div></div>
+            <div><strong>Trafikk-kjegle:</strong> FARE!</div>
+            
+            <div style="display:flex; align-items:center;"><div class="legend-icon icon-cash"></div></div>
+            <div><strong>Seddel:</strong> 50 kroner rett i banken!</div>
+
+            <div style="display:flex; align-items:center;"><div class="legend-icon icon-coin"></div></div>
+            <div><strong>Gullring:</strong> Plukk opp (+50 poeng).</div>
+            
+            <div style="display:flex; align-items:center;"><div class="legend-icon icon-boost"></div></div>
+            <div><strong>Grønn Diamant:</strong> Turbo! (+100 poeng).</div>
+        </div>
+
+        <button class="btn btn-purple" onclick="openGarage()">Garasje / Butikk 🛒</button>
+        <button class="btn btn-green" onclick="startInitialQuiz()">Ta Teoriprøven & Start ▶</button>
+    </div>
+
+    <!-- Garage Screen -->
+    <div id="garage-screen" class="modal hidden">
+        <h1>Garasje & Oppgraderinger</h1>
+        <div class="coin-display" style="font-size: 1.5rem; margin-bottom: 20px;">Saldo: <span id="garage-coins">0</span> kr</div>
+        
+        <h3>Biler & Skins</h3>
+        <div class="garage-grid" id="skin-grid">
+            <!-- Populated by JS -->
+        </div>
+
+        <h3>Oppgraderinger</h3>
+        <div class="garage-grid" id="upgrade-grid">
+            <!-- Populated by JS -->
+        </div>
+
+        <button class="btn" style="margin-top: 20px; background-color: #4b5563;" onclick="closeGarage()">Tilbake til Meny</button>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div id="quiz-screen" class="modal hidden">
+        <h3 style="color:#666; margin:0;">TEORIPRØVE</h3>
+        <div id="quiz-lives-display">❤❤</div>
+        <h2 id="quiz-question" style="font-size: 1.3rem;">Spørsmål her</h2>
+        <div id="quiz-options"></div>
+        <p id="quiz-feedback" style="font-weight:bold; min-height: 24px;"></p>
+        <button id="continue-btn" class="btn hidden" onclick="startCountdownAndDrive()">Kjør videre!</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="modal hidden">
+        <h1 id="go-title" style="color: #ef4444;">KRASJ!</h1>
+        <p id="crash-reason">Du traff en hindring.</p>
+        
+        <h2 id="score-container">Poengsum: <span id="final-score">0</span></h2>
+        
+        <div class="highscore-display">
+            Gjeldende Rekord: <span id="go-highscore">0</span>
+        </div>
+
+        <div style="background:#f0fdf4; padding:15px; border-radius:10px; margin: 10px 0; border:2px solid #22c55e;">
+             <p style="margin:0; color:#166534; font-weight:bold;">Funnet i denne runden:</p>
+             <p style="margin:5px 0; font-size:1.5rem; color:#15803d; font-weight:900;"><span id="earned-coins">0</span> kr</p>
+             <hr style="border-top: 1px solid #bbf7d0; margin: 10px 0;">
+             <p style="margin:0; color:#166534;">Din Totale Bank:</p>
+             <p style="margin:5px 0; font-size:1.2rem; color:#15803d; font-weight:bold;"><span id="go-total-coins">0</span> kr</p>
+        </div>
+
+        <div id="new-record-msg" class="highscore-display hidden" style="background-color: #22c55e; color: white; border-color: #14532d;">NY REKORD! 🏆</div>
+        
+        <p>Du må ta teoriprøven på nytt for å kjøre igjen.</p>
+        <button class="btn btn-purple" onclick="openGarage()">Garasje</button>
+        <button class="btn" onclick="resetToStart()">Hovedmeny</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // --- Game Config ---
+        const CONFIG = {
+            laneWidth: 3,
+            colors: {
+                road: 0x2c2c2c,
+                grass: 0x1a472a,
+                obstacle: 0xff4500,
+                coin: 0xfacc15,
+                boost: 0x00ff00,
+                cash: 0x85bb65, // Dollar bill green
+                skyDay: 0x87CEEB,
+                skySunset: 0xed8155,
+                skyNight: 0x0a0a2a
+            }
+        };
+
+        // --- Shop Data ---
+        const SHOP_ITEMS = {
+            skins: [
+                { id: 'red', name: 'Standard Rød', price: 0, color: 0xe11d48 },
+                { id: 'blue', name: 'Sportsblå', price: 1500, color: 0x2563eb },
+                { id: 'green', name: 'Miljøgrønn', price: 1500, color: 0x16a34a },
+                { id: 'taxi', name: 'Taxi', price: 3000, color: 0xfacc15, type: 'taxi' },
+                { id: 'neon', name: 'Neon Cyber', price: 5000, color: 0xcc00ff, shiny: true },
+                { id: 'camo', name: 'Militær Camo', price: 4000, color: 0x556b2f },
+                { id: 'gold', name: 'Luksus Gull', price: 8000, color: 0xffd700, shiny: true },
+                { id: 'police', name: 'Politibil', price: 10000, color: 0x111111, type: 'police' }
+            ],
+            upgrades: [
+                { id: 'engine', name: 'Trimmet Motor', desc: '+10% Poeng per nivå', price: 1000, maxLevel: 5 },
+                { id: 'lives', name: 'Ekstraliv', desc: '+1 liv på quiz', price: 5000, maxLevel: 1 },
+                { id: 'quiz_shortcut', name: 'Quiz-Snarvei', desc: '-1 Spørsmål per sjekk', price: 10000, maxLevel: 2 }
+            ]
+        };
+
+        // --- Game State ---
+        let state = {
+            isActive: false,
+            isPaused: false,
+            score: 0,
+            sessionCash: 0, 
+            distance: 0,
+            lastSpawnDistance: -100,
+            level: 1,
+            speed: 0.3,
+            lane: 0,
+            multiplier: 1,
+            nextQuizDistance: 200, 
+            quizPool: [],
+            lives: 2,
+            currentQuizSet: [],
+            
+            // Persisted Data
+            playerData: {
+                highscore: 0,
+                coins: 0,
+                inventory: ['red'], 
+                equippedSkin: 'red',
+                upgradeLevels: { engine: 0, lives: 0, quiz_shortcut: 0 }
+            }
+        };
+
+        // --- Question Bank ---
+        const questionBank = [
+             { q: "Hva er det aller første du gjør når du kommer til et skadested?", options: ["Løper til de skadde", "Sikrer skadestedet", "Ringer 113"], correct: 1, exp: "Sikre stedet for å hindre flere ulykker." },
+            { q: "Hva er nødnummeret til medisinsk hjelp (ambulanse)?", options: ["110", "112", "113"], correct: 2, exp: "113 er for livstruende helsehjelp." },
+            { q: "Hva er nødnummeret til Brannvesenet?", options: ["110", "112", "113"], correct: 0, exp: "110 er til brann." },
+            { q: "Hva er nødnummeret til Politiet?", options: ["110", "112", "113"], correct: 1, exp: "112 er til politi." },
+            { q: "Hva står BLÅ for i førstehjelp?", options: ["Bevissthet, Luftveier, Åndedrett", "Blod, Lårhals, Åreknute", "Bil, Lys, Åpning"], correct: 0, exp: "Sjekk Bevissthet, frie Luftveier og Åndedrett." },
+            { q: "Hvordan sikrer du frie luftveier på en bevisstløs?", options: ["Løfte hodet opp", "Bøye hodet bakover, løft haken", "Gi vann å drikke"], correct: 1, exp: "Hodet bakover og haken opp." },
+            { q: "Hvorfor er refleksvest viktig ved ulykke?", options: ["For å holde varmen", "For å se ut som en vakt", "For å bli sett av andre biler"], correct: 2, exp: "Synlighet redder liv." },
+            { q: "Hvor langt fra bilen bør varseltrekanten stå på landevei?", options: ["50-100 meter", "150-250 meter", "Minst 500 meter"], correct: 1, exp: "150-250 meter gir biler tid til å bremse." },
+            { q: "Hva gjør du hvis en person ikke puster?", options: ["Starter Hjerte-Lunge-Redning (HLR)", "Legger personen i stabilt sideleie", "Venter på ambulansen"], correct: 0, exp: "Start HLR (30 kompresjoner, 2 innblåsninger) umiddelbart." },
+            { q: "Hva er stabilt sideleie til for?", options: ["At personen skal sove godt", "Holde luftveiene frie ved bevisstløshet", "Stoppe blødninger"], correct: 1, exp: "Det hindrer kvelning hvis man kaster opp." },
+            { q: "Hvilken form har fareskilt?", options: ["Runde", "Trekant med spiss opp", "Firkantede"], correct: 1, exp: "Trekant med rød kant og spiss opp." },
+            { q: "Hvilket skilt har form som en trekant med spissen NED?", options: ["Fartsgrense", "Vikeplikt", "Stopp-skilt"], correct: 1, exp: "Vikepliktskiltet er unikt." },
+            { q: "Hvilken form har et stopp-skilt?", options: ["Rundt", "Trekantet", "Åttekantet"], correct: 2, exp: "Det er åttekantet for å gjenkjennes bakfra." },
+            { q: "Hva betyr et rundt skilt med rød kant og tall inni?", options: ["Anbefalt fart", "Minstefart", "Fartsgrense (Forbud)", "Påbudt fart"], correct: 2, exp: "Det er forbudt å kjøre fortere enn tallet." },
+            { q: "Hva betyr et blått firkantet skilt med hvit pil?", options: ["Enveiskjøring", "Påbudt kjøreretning", "Blindvei"], correct: 0, exp: "Opplysning om enveiskjøring." },
+            { q: "Hva betyr skilt med gul bakgrunn?", options: ["Turistvei", "Midlertidig skilting (Veiarbeid)", "Skolevei"], correct: 1, exp: "Gult betyr midlertidig endring." },
+            { q: "Hva betyr et rundt blått skilt med hvit pil?", options: ["Du kan velge retning", "Påbudt kjøreretning", "Enveiskjøring"], correct: 1, exp: "Du MÅ følge pilens retning." },
+            { q: "Hva betyr et skilt med hvit firkant med rød strek over?", options: ["Parkering forbudt", "Blindvei", "Oppheving av tidligere skilt"], correct: 2, exp: "Slutt på fartsgrense eller forbud." },
+            { q: "Hvem har vikeplikt i kryss uten skilt (Høyreregelen)?", options: ["De fra venstre", "De fra høyre", "Den på bredest vei"], correct: 0, exp: "Du har vikeplikt for de som kommer fra din høyre side." },
+            { q: "Hva betyr gul stripe i veien?", options: ["Enveiskjøring", "Skiller motgående trafikk", "Parkering forbudt"], correct: 1, exp: "Du har trafikk imot på andre siden." },
+            { q: "Hva betyr hvit stripe i veien?", options: ["Skiller felt i samme retning", "Skiller motgående trafikk", "Gangfelt"], correct: 0, exp: "Alle kjører samme vei." },
+            { q: "Hva er normal fartsgrense i tettbygd strøk?", options: ["30 km/t", "50 km/t", "80 km/t"], correct: 1, exp: "50 km/t er standard." },
+            { q: "Hva er normal fartsgrense utenfor tettbygd strøk?", options: ["50 km/t", "80 km/t", "90 km/t"], correct: 1, exp: "80 km/t er standard på landevei." },
+            { q: "Du skal ut av en parkeringsplass. Hvem har vikeplikt?", options: ["De på veien", "Du har vikeplikt", "Høyreregelen gjelder"], correct: 1, exp: "Du har vikeplikt når du kommer fra parkering." },
+            { q: "Hva betyr det å flette?", options: ["Kjøre sikksakk", "Annenhver bil kjører", "Størst bil først"], correct: 1, exp: "Vær smidig, slipp inn annenhver bil." },
+            { q: "Er det påbudt med bilbelte i baksetet?", options: ["Nei", "Ja", "Kun for barn"], correct: 1, exp: "Alle i bilen skal bruke belte." },
+            { q: "Hva er promillegrensen i Norge?", options: ["0,0", "0,2", "0,5", "0,8"], correct: 1, exp: "0,2 promille." },
+            { q: "Hva skjer med en løs iPad i baksetet ved krasj i 50 km/t?", options: ["Ingenting", "Den veier det samme", "Den treffer som en murstein"], correct: 2, exp: "Løse gjenstander blir livsfarlige prosjektiler." },
+            { q: "Hvor bør tunge ting pakkes i bilen?", options: ["I takboksen", "Høyt oppe i bagasjerommet", "Lavt og inntil seteryggen"], correct: 2, exp: "Lavt tyngdepunkt sikrer bilen og lasten." },
+            { q: "Hvilket lys er påbudt å kjøre med om dagen?", options: ["Fjernlys", "Kjørelys (nærlys)", "Parkeringslys"], correct: 1, exp: "Kjørelys/nærlys er påbudt hele døgnet." },
+            { q: "Du skal til venstre i en rundkjøring. Hvilket felt?", options: ["Høyre felt", "Venstre felt", "Valgfritt"], correct: 1, exp: "Venstre felt for venstresving." },
+            { q: "Du skal rett frem i en rundkjøring. Hvilket felt?", options: ["Som regel høyre felt", "Alltid venstre felt", "Midten"], correct: 0, exp: "Høyre felt er hovedregelen for rett frem." },
+            { q: "Når skal du blinke i en rundkjøring?", options: ["Kun på vei inn", "Når du skal ut", "Man trenger ikke blinke"], correct: 1, exp: "Blink til høyre når du skal ut." },
+            { q: "Hva er en blindsone?", options: ["Når sola blender deg", "Området du ikke ser i speilene", "Tunnel"], correct: 1, exp: "Snu hodet for å sjekke blindsonen." },
+            { q: "Hva betyr Eco-driving?", options: ["Kjøre fort", "Kjøre økonomisk og miljøvennlig", "Kjøre elbil"], correct: 1, exp: "Jevn kjøring sparer drivstoff." },
+            { q: "Når skal du bruke blinklys?", options: ["Mens du svinger", "Etter svingen", "I god tid FØR du svinger"], correct: 2, exp: "Gi tydelig tegn til andre." },
+            { q: "Du ser en syklist foran deg. Hva gjør du?", options: ["Tuter", "Kjører forbi med god avstand", "Ligger helt inntil"], correct: 1, exp: "Hold minst 1,5 meter avstand." },
+            { q: "Er det lov å bruke mobiltelefon håndholdt når du kjører?", options: ["Ja, hvis det er viktig", "Nei, aldri", "Ja, i kø"], correct: 1, exp: "Det er forbudt og farlig." },
+            { q: "Når bør du blende ned fra fjernlys ved møte?", options: ["Når du ser bilen", "200-300 meter før", "Når den andre blinker"], correct: 1, exp: "Unngå å blende motgående fører." },
+            { q: "Hva er reaksjonstid?", options: ["Tiden fra du ser faren til du bremser", "Tiden bilen bruker på å stoppe", "Tiden det tar å svinge"], correct: 0, exp: "Normalt ca. 1 sekund." },
+            { q: "Hvordan endres bremselengden på glatt føre?", options: ["Den blir kortere", "Den dobles", "Den kan bli 4-5 ganger lengre"], correct: 2, exp: "Is og snø øker bremselengden dramatisk." },
+            { q: "Hva skjer med bremselengden hvis du dobler farten?", options: ["Den dobles", "Den firedobles", "Den tredobles"], correct: 1, exp: "Fysikkens lover: 2x fart = 4x bremselengde." },
+            { q: "Hva er vannplaning?", options: ["Bilen flyter på vannhinne og mister styring", "Du kjører i en vanndam", "Bilen blir ren"], correct: 0, exp: "Dekkene mister kontakten med veien." },
+            { q: "Hvilken farge har refleksbrikker bak på bilen?", options: ["Hvite", "Gule", "Røde"], correct: 2, exp: "Alt bakover skal være rødt (unntatt ryggelys)." },
+            { q: "Hva betyr det hvis trafikklyset blinker gult?", options: ["Full stopp", "Trafikklys ute av drift - følg skilt/regler", "Kjør fort"], correct: 1, exp: "Vær ekstra oppmerksom, anlegget virker ikke." },
+            { q: "Kan du kjøre forbi i et gangfelt?", options: ["Ja", "Nei", "Bare hvis ingen går der"], correct: 1, exp: "Det er strengt forbudt å kjøre forbi ved gangfelt." },
+            { q: "Hva betyr skiltet 'Parkering forbudt'?", options: ["Ingen stans lov", "Du kan stanse, men ikke parkere", "Gratis parkering"], correct: 1, exp: "Kort stans for av/påstigning er lov." },
+            { q: "Hva betyr skiltet 'Stans forbudt'?", options: ["Du kan ikke stanse i det hele tatt", "Parkering lov", "Vikeplikt"], correct: 0, exp: "Her kan du ikke stoppe bilen et sekund engang." },
+            { q: "Hva gjør du hvis du kommer til et kryss med gult blinklys?", options: ["Venter på grønt", "Kjører forsiktig (følger vikeplikt)", "Stopper"], correct: 1, exp: "Gult blink betyr 'vær varsom'." },
+            { q: "Hvor mange meter beveger bilen seg på 1 sekund i 80 km/t?", options: ["ca 10 meter", "ca 22 meter", "ca 40 meter"], correct: 1, exp: "Del på 3.6. 80 / 3.6 er ca 22 meter." },
+            { q: "Når er det størst fare for å treffe elg?", options: ["Midt på dagen", "I skumring og demring", "Midt på natten"], correct: 1, exp: "Elgen er mest aktiv morgen og kveld." }
+        ];
+
+        // --- Three.js Globals ---
+        let scene, camera, renderer;
+        let car, road, sunLight, hemiLight;
+        let objects = []; 
+        let scenery = []; 
+        let roadLines = [];
+
+        // --- Init ---
+        function init() {
+            loadPlayerData();
+            // Force update UI initially
+            updateUI();
+
+            const container = document.getElementById('canvas-container');
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(CONFIG.colors.skyDay);
+            scene.fog = new THREE.Fog(CONFIG.colors.skyDay, 10, 80);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+            camera.position.set(0, 4, 8);
+            camera.lookAt(0, 0, -10);
+
+            hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
+            scene.add(hemiLight);
+
+            sunLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            sunLight.position.set(20, 50, 20);
+            sunLight.castShadow = true;
+            scene.add(sunLight);
+
+            createRoad();
+            createCar();
+            
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('touchstart', handleTouchStart, {passive: false});
+
+            animate();
+        }
+
+        // --- Data Persistence ---
+        function loadPlayerData() {
+            const data = localStorage.getItem('trafikkhelten_save_v2');
+            if(data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    state.playerData = { ...state.playerData, ...parsed };
+                } catch(e) {
+                    console.error("Could not parse save data", e);
+                }
+                if(!state.playerData.inventory) state.playerData.inventory = ['red'];
+                if(!state.playerData.upgradeLevels) state.playerData.upgradeLevels = {engine:0, lives:0};
+            }
+        }
+
+        function savePlayerData() {
+            try {
+                localStorage.setItem('trafikkhelten_save_v2', JSON.stringify(state.playerData));
+            } catch (e) {
+                console.error("Could not save data", e);
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            // Update all UI elements that reflect persistent data
+            const highscore = state.playerData.highscore;
+            const coins = state.playerData.coins;
+            
+            const elStartHigh = document.getElementById('start-highscore');
+            if(elStartHigh) elStartHigh.innerText = highscore;
+            
+            const elHudHigh = document.getElementById('hud-highscore');
+            if(elHudHigh) elHudHigh.innerText = highscore;
+            
+            const elStartCoins = document.getElementById('start-coins');
+            if(elStartCoins) elStartCoins.innerText = coins;
+            
+            const elGarageCoins = document.getElementById('garage-coins');
+            if(elGarageCoins) elGarageCoins.innerText = coins;
+            
+            // HUD coins show total wallet + current session cash
+            const elHudCoins = document.getElementById('hud-coins');
+            if(elHudCoins) elHudCoins.innerText = coins + state.sessionCash;
+        }
+
+        // --- Shop Logic ---
+        function openGarage() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('garage-screen').classList.remove('hidden');
+            renderGarage();
+        }
+
+        function closeGarage() {
+            document.getElementById('garage-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            
+            if(car) scene.remove(car);
+            createCar();
+        }
+
+        function renderGarage() {
+            const skinGrid = document.getElementById('skin-grid');
+            skinGrid.innerHTML = '';
+            
+            SHOP_ITEMS.skins.forEach(skin => {
+                const isOwned = state.playerData.inventory.includes(skin.id);
+                const isEquipped = state.playerData.equippedSkin === skin.id;
+                
+                const div = document.createElement('div');
+                div.className = `garage-item ${isEquipped ? 'equipped' : ''}`;
+                
+                const hexColor = '#' + skin.color.toString(16).padStart(6, '0');
+                
+                div.innerHTML = `
+                    <h4>${skin.name}</h4>
+                    <div class="car-preview" style="background-color: ${hexColor}; ${skin.id === 'police' ? 'border-top: 5px solid white;' : ''}"></div>
+                    ${!isOwned ? `<div class="price-tag">${skin.price} kr</div>` : ''}
+                `;
+
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.style.width = '100%';
+                btn.style.fontSize = '14px';
+                btn.style.padding = '8px';
+
+                if (isEquipped) {
+                    btn.innerText = "Valgt";
+                    btn.className += " btn-green";
+                    btn.disabled = true;
+                } else if (isOwned) {
+                    btn.innerText = "Velg";
+                    btn.onclick = () => {
+                        state.playerData.equippedSkin = skin.id;
+                        savePlayerData();
+                        renderGarage();
+                    };
+                } else {
+                    btn.innerText = "Kjøp";
+                    if (state.playerData.coins >= skin.price) {
+                        btn.className += " btn-purple";
+                        btn.onclick = () => {
+                            state.playerData.coins -= skin.price;
+                            state.playerData.inventory.push(skin.id);
+                            savePlayerData();
+                            renderGarage();
+                        };
+                    } else {
+                        btn.className += " btn-disabled";
+                        btn.disabled = true;
+                    }
+                }
+                div.appendChild(btn);
+                skinGrid.appendChild(div);
+            });
+
+            const upgradeGrid = document.getElementById('upgrade-grid');
+            upgradeGrid.innerHTML = '';
+
+            SHOP_ITEMS.upgrades.forEach(upg => {
+                const level = state.playerData.upgradeLevels[upg.id] || 0;
+                const isMax = level >= upg.maxLevel;
+                const cost = upg.price * (level + 1);
+
+                const div = document.createElement('div');
+                div.className = 'garage-item';
+                div.innerHTML = `
+                    <h4>${upg.name} (Lvl ${level})</h4>
+                    <p style="font-size:12px; margin:0; color: #d1d5db;">${upg.desc}</p>
+                    ${!isMax ? `<div class="price-tag">${cost} kr</div>` : '<div class="price-tag" style="color:#22c55e">Maks</div>'}
+                `;
+
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.style.width = '100%';
+                btn.style.fontSize = '14px';
+                btn.style.padding = '8px';
+
+                if (isMax) {
+                    btn.innerText = "Fullt";
+                    btn.className += " btn-green";
+                    btn.disabled = true;
+                } else {
+                    btn.innerText = "Oppgrader";
+                    if (state.playerData.coins >= cost) {
+                        btn.className += " btn-purple";
+                        btn.onclick = () => {
+                            state.playerData.coins -= cost;
+                            state.playerData.upgradeLevels[upg.id] = level + 1;
+                            savePlayerData();
+                            renderGarage();
+                        };
+                    } else {
+                        btn.className += " btn-disabled";
+                        btn.disabled = true;
+                    }
+                }
+                div.appendChild(btn);
+                upgradeGrid.appendChild(div);
+            });
+        }
+
+
+        // --- 3D Creation Helpers ---
+        function createRoad() {
+            const roadGeo = new THREE.PlaneGeometry(12, 400);
+            const roadMat = new THREE.MeshPhongMaterial({ color: CONFIG.colors.road, shininess: 10 });
+            road = new THREE.Mesh(roadGeo, roadMat);
+            road.rotation.x = -Math.PI / 2;
+            road.position.z = -100;
+            road.receiveShadow = true;
+            scene.add(road);
+
+            const groundGeo = new THREE.PlaneGeometry(400, 400);
+            const groundMat = new THREE.MeshLambertMaterial({ color: CONFIG.colors.grass });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -0.1;
+            ground.position.z = -100;
+            scene.add(ground);
+
+            const lineGeo = new THREE.PlaneGeometry(0.3, 6);
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            
+            for(let i=0; i<15; i++) {
+                let l1 = new THREE.Mesh(lineGeo, lineMat);
+                l1.rotation.x = -Math.PI / 2;
+                l1.position.set(-2, 0.02, -i * 12);
+                scene.add(l1);
+                roadLines.push(l1);
+
+                let l2 = new THREE.Mesh(lineGeo, lineMat);
+                l2.rotation.x = -Math.PI / 2;
+                l2.position.set(2, 0.02, -i * 12);
+                scene.add(l2);
+                roadLines.push(l2);
+            }
+        }
+
+        function createCar() {
+            car = new THREE.Group();
+            
+            const skinId = state.playerData.equippedSkin;
+            const skinData = SHOP_ITEMS.skins.find(s => s.id === skinId) || SHOP_ITEMS.skins[0];
+            const carColor = skinData.color;
+
+            // Car Body
+            const chassisGeo = new THREE.BoxGeometry(1.6, 0.6, 3.2);
+            const chassisMat = new THREE.MeshStandardMaterial({ 
+                color: carColor, 
+                roughness: skinData.shiny ? 0.1 : 0.3, 
+                metalness: skinData.shiny ? 0.8 : 0.1 
+            });
+            const chassis = new THREE.Mesh(chassisGeo, chassisMat);
+            chassis.position.y = 0.6;
+            chassis.castShadow = true;
+            car.add(chassis);
+
+            // Roof/Cabin
+            const cabinGeo = new THREE.BoxGeometry(1.4, 0.5, 1.8);
+            const roofColor = (skinId === 'police' || skinId === 'taxi') ? 0xffffff : 0x333333;
+            const cabinMat = new THREE.MeshStandardMaterial({ color: roofColor, roughness: 0.1 });
+            const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+            cabin.position.set(0, 1.1, -0.2);
+            car.add(cabin);
+
+            // Taxi Sign
+            if(skinId === 'taxi') {
+                const signGeo = new THREE.BoxGeometry(0.6, 0.2, 0.2);
+                const signMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const sign = new THREE.Mesh(signGeo, signMat);
+                sign.position.set(0, 1.45, -0.2);
+                car.add(sign);
+            }
+
+            // Police Lights
+            if(skinId === 'police') {
+                const barGeo = new THREE.BoxGeometry(1.2, 0.15, 0.3);
+                const barMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+                const bar = new THREE.Mesh(barGeo, barMat);
+                bar.position.set(0, 1.4, -0.2);
+                car.add(bar);
+
+                const blueL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.3), new THREE.MeshBasicMaterial({color: 0x0000ff}));
+                blueL.position.set(-0.35, 1.4, -0.2);
+                car.add(blueL);
+
+                const redL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.3), new THREE.MeshBasicMaterial({color: 0xff0000}));
+                redL.position.set(0.35, 1.4, -0.2);
+                car.add(redL);
+            }
+
+            // Lights
+            const lightGeo = new THREE.BoxGeometry(0.3, 0.2, 0.1);
+            const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+            const hlLeft = new THREE.Mesh(lightGeo, lightMat);
+            hlLeft.position.set(-0.5, 0.6, -1.6);
+            car.add(hlLeft);
+            const hlRight = new THREE.Mesh(lightGeo, lightMat);
+            hlRight.position.set(0.5, 0.6, -1.6);
+            car.add(hlRight);
+
+            // Wheels
+            const wGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.3, 16);
+            const wMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+            [[-0.7,0.35,1], [0.7,0.35,1], [-0.7,0.35,-1], [0.7,0.35,-1]].forEach(pos => {
+                const w = new THREE.Mesh(wGeo, wMat);
+                w.rotation.z = Math.PI/2;
+                w.position.set(...pos);
+                car.add(w);
+            });
+            scene.add(car);
+        }
+
+        function createSceneryObj(type, x, z) {
+            if (type === 'tree') {
+                const g = new THREE.Group();
+                const t = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.5,2,6), new THREE.MeshLambertMaterial({color:0x5c4033}));
+                t.position.y=1; g.add(t);
+                const l = new THREE.Mesh(new THREE.ConeGeometry(1.5,2,8), new THREE.MeshLambertMaterial({color:0x0f5f0f}));
+                l.position.y=2.5; g.add(l);
+                g.position.set(x,0,z);
+                return g;
+            } else {
+                const h = 3+Math.random()*5;
+                const m = new THREE.Mesh(new THREE.BoxGeometry(3,h,3), new THREE.MeshPhongMaterial({color:0x777777}));
+                m.position.set(x,h/2,z);
+                return m;
+            }
+        }
+
+        // --- Game Logic ---
+
+        function getQuestionCount() {
+            const lvl = state.playerData.upgradeLevels.quiz_shortcut || 0;
+            if (lvl === 2) return 1;
+            if (lvl === 1) return 2;
+            return 3;
+        }
+
+        function getUniqueQuestions(count) {
+            let result = [];
+            for (let i = 0; i < count; i++) {
+                if (state.quizPool.length === 0) {
+                    state.quizPool = [...questionBank];
+                    state.quizPool.sort(() => Math.random() - 0.5);
+                }
+                result.push(state.quizPool.pop());
+            }
+            return result;
+        }
+
+        function startInitialQuiz() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            // RESET GAME SESSION DATA HERE
+            state.score = 0;
+            state.sessionCash = 0;
+            state.distance = 0;
+            state.level = 1;
+            
+            // Calculate Lives based on upgrade
+            const extraLives = state.playerData.upgradeLevels.lives || 0;
+            state.lives = 2 + extraLives;
+            
+            updateHearts();
+
+            if (state.quizPool.length === 0) {
+                state.quizPool = [...questionBank];
+                state.quizPool.sort(() => Math.random() - 0.5);
+            }
+
+            state.currentQuizSet = getUniqueQuestions(3);
+            state.quizIndex = 0;
+            state.inGameQuiz = false;
+
+            loadQuizQuestion(state.currentQuizSet[0]);
+        }
+
+        function loadQuizQuestion(q) {
+            document.getElementById('quiz-question').innerText = q.q;
+            document.getElementById('quiz-feedback').innerText = "";
+            document.getElementById('continue-btn').classList.add('hidden');
+            
+            // Update Hearts UI
+            updateHearts();
+
+            const optsContainer = document.getElementById('quiz-options');
+            optsContainer.innerHTML = '';
+
+            let shuffledOptions = q.options.map((text, index) => {
+                return { text: text, isCorrect: (index === q.correct) };
+            });
+            shuffledOptions.sort(() => Math.random() - 0.5);
+
+            shuffledOptions.forEach((optObj) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.innerText = optObj.text;
+                btn.onclick = () => handleAnswer(q, optObj, btn, optsContainer);
+                optsContainer.appendChild(btn);
+            });
+        }
+
+        function handleAnswer(q, optObj, btn, optsContainer) {
+            Array.from(optsContainer.children).forEach(b => b.disabled = true);
+            const feedback = document.getElementById('quiz-feedback');
+
+            if(optObj.isCorrect) {
+                btn.classList.add('btn-correct');
+                feedback.style.color = 'green';
+                feedback.innerText = "Riktig! " + q.exp;
+                setTimeout(() => nextQuizStep(), 1500);
+            } else {
+                btn.classList.add('btn-wrong');
+                state.lives--; 
+                updateHearts(); 
+                
+                feedback.style.color = 'red';
+                if(state.lives > 0) {
+                    feedback.innerText = "Feil! Du mistet et liv. " + q.exp;
+                    setTimeout(() => nextQuizStep(), 2500);
+                } else {
+                    feedback.innerText = "Feil! Ingen liv igjen.";
+                    setTimeout(() => failQuiz(), 1500);
+                }
+            }
+        }
+
+        function updateHearts() {
+            let h = "";
+            for(let i=0; i<state.lives; i++) h += "❤";
+            // If lives < 0 (safety), show empty
+            if (state.lives < 0) h = "";
+            document.getElementById('quiz-lives-display').innerText = h;
+        }
+
+        function nextQuizStep() {
+            if(state.lives <= 0) {
+                failQuiz();
+                return;
+            }
+
+            state.quizIndex++;
+            if(state.quizIndex < state.currentQuizSet.length) {
+                loadQuizQuestion(state.currentQuizSet[state.quizIndex]);
+            } else {
+                if (!state.inGameQuiz) {
+                    prepareGameWorld();
+                } else {
+                    document.getElementById('quiz-screen').classList.add('hidden');
+                    startCountdownAndDrive(true);
+                }
+            }
+        }
+
+        function failQuiz() {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            // Ensure 0 session cash recorded if failed at start
+            if(!state.inGameQuiz) { state.sessionCash = 0; }
+            gameOver("Du strøk på teoriprøven!", true);
+        }
+
+        function prepareGameWorld() {
+            // Setup game variables
+            state.lastSpawnDistance = -100;
+            state.speed = 0.4;
+            state.nextQuizDistance = 300;
+            state.isActive = false;
+            state.isPaused = true;
+            
+            const engineLvl = state.playerData.upgradeLevels.engine || 0;
+            state.multiplier = 1 + (engineLvl * 0.1);
+
+            objects.forEach(o => scene.remove(o.mesh));
+            objects = [];
+            scenery.forEach(s => scene.remove(s));
+            scenery = [];
+            
+            for(let i=0; i<15; i++) spawnScenery(-50 - (i*20));
+
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('controls-hint').style.display = 'block';
+            updateUI(); 
+
+            startCountdownAndDrive(false);
+        }
+
+        function startCountdownAndDrive(isResuming) {
+            document.getElementById('quiz-screen').classList.add('hidden');
+            document.getElementById('hud').style.display = 'flex';
+
+            const flash = document.getElementById('flash-overlay');
+            let count = 3;
+            
+            const runCount = () => {
+                flash.classList.remove('countdown-anim');
+                flash.offsetHeight; 
+                flash.style.opacity = ""; 
+
+                if(count > 0) {
+                    flash.innerText = count;
+                    flash.classList.add('countdown-anim');
+                    count--;
+                    setTimeout(runCount, 1000);
+                } else {
+                    flash.innerText = "KJØR!";
+                    flash.classList.add('countdown-anim');
+                    
+                    setTimeout(() => {
+                        state.isActive = true;
+                        state.isPaused = false;
+                    }, 800);
+                }
+            };
+            runCount();
+        }
+
+        function updateGame() {
+            if(!state.isActive || state.isPaused) return;
+
+            state.distance += state.speed;
+            state.score += (state.speed * 0.5) * state.multiplier;
+            
+            document.getElementById('score').innerText = Math.floor(state.score);
+            document.getElementById('level-display').innerText = state.level;
+
+            // Live Highscore Update - Check against current score
+            if (state.score > state.playerData.highscore) {
+                document.getElementById('hud-highscore').innerText = Math.floor(state.score);
+                document.getElementById('hud-highscore').style.color = '#00ff00';
+            }
+
+            // Level Up
+            const newLevel = 1 + Math.floor(state.distance / 500);
+            if(newLevel > state.level) {
+                state.level = newLevel;
+                state.speed += 0.05; 
+                updateLevelVisuals();
+                showFlashText("NIVÅ OPP!");
+            }
+
+            // In-Game Quiz
+            if(state.distance > state.nextQuizDistance) {
+                triggerInGameQuiz();
+                return;
+            }
+
+            // Road Lines
+            roadLines.forEach(l => {
+                l.position.z += state.speed;
+                if(l.position.z > 10) l.position.z -= 180;
+            });
+
+            // Scenery
+            if(Math.random() < 0.1) spawnScenery(-150);
+            for(let i=scenery.length-1; i>=0; i--) {
+                scenery[i].position.z += state.speed;
+                if(scenery[i].position.z > 20) { scene.remove(scenery[i]); scenery.splice(i,1); }
+            }
+
+            // Car Physics
+            const targetX = state.lane * CONFIG.laneWidth;
+            car.position.x += (targetX - car.position.x) * 0.15;
+            car.rotation.z = (car.position.x - targetX) * 0.05;
+            car.rotation.x = -Math.sin(Date.now() * 0.02) * 0.01;
+
+            // Spawning Logic
+            const minGap = 20; 
+            if (state.distance - state.lastSpawnDistance > minGap) {
+                 const spawnChance = 0.05 + (state.level * 0.01);
+                 if(Math.random() < spawnChance) {
+                     spawnPattern(); 
+                     state.lastSpawnDistance = state.distance;
+                 }
+            }
+
+            // Object Loop
+            for(let i=objects.length-1; i>=0; i--) {
+                let obj = objects[i];
+                obj.mesh.position.z += state.speed;
+                
+                if(obj.type !== 'obstacle') obj.mesh.rotation.y += 0.05;
+
+                const dz = Math.abs(obj.mesh.position.z - car.position.z);
+                const dx = Math.abs(obj.mesh.position.x - car.position.x);
+                
+                if(obj.active && dz < 1.3 && dx < 1.1) {
+                    handleCollision(obj);
+                }
+
+                if(obj.mesh.position.z > 10) {
+                    scene.remove(obj.mesh);
+                    objects.splice(i,1);
+                }
+            }
+        }
+
+        // Safe patterns
+        function spawnPattern() {
+            const count = (Math.random() < (0.2 + state.level * 0.1)) ? 2 : 1;
+            let lanes = [-1, 0, 1];
+            lanes.sort(() => Math.random() - 0.5);
+            for(let i=0; i<count; i++) {
+                createObjectInLane(lanes[i]);
+            }
+        }
+
+        function createObjectInLane(lane) {
+            const x = lane * CONFIG.laneWidth;
+            const z = -100;
+
+            let type = 'obstacle';
+            const rnd = Math.random();
+            if(rnd > 0.8) type = 'coin';
+            else if (rnd > 0.7) type = 'cash'; // 10% chance for cash
+            else if (rnd > 0.65) type = 'boost';
+
+            let mesh;
+            if(type === 'obstacle') {
+                const geo = new THREE.ConeGeometry(0.5, 1.2, 16);
+                const mat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.obstacle, emissive: 0x440000 });
+                mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(x, 0.6, z);
+                const s = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.45,0.2,16), new THREE.MeshBasicMaterial({color:0xffffff}));
+                s.position.y=-0.2; mesh.add(s);
+            } else if (type === 'coin') {
+                mesh = new THREE.Mesh(new THREE.TorusGeometry(0.4,0.1,8,16), new THREE.MeshStandardMaterial({color:CONFIG.colors.coin, metalness:1, emissive:0x333300}));
+                mesh.position.set(x,0.8,z);
+            } else if (type === 'cash') {
+                // Cash Bill Geometry
+                mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 1.4), new THREE.MeshStandardMaterial({color: CONFIG.colors.cash, roughness: 0.8}));
+                mesh.position.set(x, 0.5, z);
+            } else {
+                mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshStandardMaterial({color:CONFIG.colors.boost, emissive:0x00ff00}));
+                mesh.position.set(x,0.8,z);
+            }
+            mesh.castShadow = true;
+            scene.add(mesh);
+            objects.push({mesh, type, active:true});
+        }
+
+        function triggerInGameQuiz() {
+            state.isPaused = true;
+            state.inGameQuiz = true;
+            state.nextQuizDistance += 400 + (Math.random() * 200);
+            
+            const qs = getUniqueQuestions(getQuestionCount());
+            state.currentQuizSet = qs;
+            state.quizIndex = 0;
+            
+            updateHearts();
+            
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            loadQuizQuestion(qs[0]);
+        }
+
+        function spawnScenery(z) {
+            const side = Math.random()>0.5?1:-1;
+            const x = side * (8+Math.random()*20);
+            const obj = createSceneryObj(state.level===3?'building':'tree', x, z);
+            scene.add(obj); scenery.push(obj);
+        }
+
+        function handleCollision(obj) {
+            obj.active = false;
+            scene.remove(obj.mesh);
+            if(obj.type === 'obstacle') {
+                gameOver("Du krasjet!");
+            } else if (obj.type === 'cash') {
+                const cashVal = 50;
+                state.sessionCash += cashVal;
+                showFloatText("+" + cashVal + " kr");
+                flashEffect('#85bb65');
+                updateUI(); // Update HUD
+            } else {
+                const pts = obj.type==='coin'?50:100;
+                state.score += pts;
+                showFloatText("+" + pts);
+                flashEffect(obj.type==='coin'?'#FFFF00':'#00FF00');
+            }
+        }
+
+        function gameOver(reason, isQuizFail = false) {
+            state.isActive = false;
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            
+            document.getElementById('crash-reason').innerText = reason;
+            document.getElementById('go-title').innerText = isQuizFail ? "STRØK!" : "KRASJ!";
+            
+            document.getElementById('score-container').style.display = isQuizFail ? 'none' : 'block';
+            
+            const finalScore = Math.floor(state.score);
+            document.getElementById('final-score').innerText = finalScore;
+
+            // Only add session cash collected
+            const totalEarnings = state.sessionCash;
+            state.playerData.coins += totalEarnings;
+            document.getElementById('earned-coins').innerText = totalEarnings;
+            
+            // Check Highscore logic
+            const recordMsg = document.getElementById('new-record-msg');
+            if(!isQuizFail && finalScore > state.playerData.highscore) {
+                state.playerData.highscore = finalScore;
+                recordMsg.classList.remove('hidden');
+            } else {
+                recordMsg.classList.add('hidden');
+            }
+            
+            // Ensure UI is updated before showing it
+            const goHighscoreEl = document.getElementById('go-highscore');
+            goHighscoreEl.innerText = state.playerData.highscore; // Ensure correct highscore is shown
+            
+            document.getElementById('go-total-coins').innerText = state.playerData.coins;
+
+            savePlayerData();
+        }
+
+        function resetToStart() {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            if(car) { car.position.set(0,0,0); }
+            updateUI(); 
+            // Reset HUD color
+            document.getElementById('hud-highscore').style.color = 'white';
+        }
+
+        function showFlashText(text) {
+            const el = document.getElementById('flash-overlay');
+            el.innerText = text;
+            el.classList.remove('countdown-anim');
+            el.offsetHeight;
+            el.classList.add('countdown-anim');
+        }
+
+        function showFloatText(text) {
+            const div = document.createElement('div');
+            div.className = 'float-text';
+            div.innerText = text;
+            document.getElementById('float-text-container').appendChild(div);
+            setTimeout(() => div.remove(), 1000);
+        }
+
+        function flashEffect(color) {
+            const el = document.getElementById('effect-overlay');
+            el.style.backgroundColor = color;
+            el.style.opacity = 0.3;
+            setTimeout(() => el.style.opacity = 0, 200);
+        }
+
+        function updateLevelVisuals() {
+            let col = CONFIG.colors.skyDay;
+            if(state.level===2) col = CONFIG.colors.skySunset;
+            if(state.level>=3) col = CONFIG.colors.skyNight;
+            scene.background.setHex(col);
+            scene.fog.color.setHex(col);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        function handleKeyDown(e) {
+            if(!state.isActive || state.isPaused) return;
+            if(e.key === 'ArrowLeft' || e.key === 'a') if(state.lane > -1) state.lane--;
+            if(e.key === 'ArrowRight' || e.key === 'd') if(state.lane < 1) state.lane++;
+        }
+        function handleTouchStart(e) {
+            if(!state.isActive || state.isPaused) return;
+            if(e.target.tagName === 'BUTTON') return;
+            e.preventDefault();
+            if(e.touches[0].clientX < window.innerWidth/2) { if(state.lane>-1) state.lane--; }
+            else { if(state.lane<1) state.lane++; }
+        }
+        function animate() {
+            requestAnimationFrame(animate);
+            updateGame();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
