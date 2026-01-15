@@ -1180,9 +1180,9 @@
             state.playerData.coins += totalEarnings;
             document.getElementById('earned-coins').innerText = totalEarnings;
             
-            // Check Highscore logic
+            // Check Highscore logic - FIXED: Allow highscore update even on quiz fail
             const recordMsg = document.getElementById('new-record-msg');
-            if(!isQuizFail && finalScore > state.playerData.highscore) {
+            if(finalScore > state.playerData.highscore) {
                 state.playerData.highscore = finalScore;
                 recordMsg.classList.remove('hidden');
             } else {
